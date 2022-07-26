@@ -54,6 +54,8 @@ def get_rank(guess_item, gold_item):
 
 # 1. Precision computation
 def _precision(rank):
+    if len(rank) == 0:
+        return 0
 
     p = rank.count(True) / len(rank)
 
@@ -78,6 +80,8 @@ def _propensity_scored_precision_at_k(rank, guess_inv_propensity_scores, gold_in
 
 # 2. Recall computation
 def _recall(rank, num_distinct_labels):
+    if num_distinct_labels == 0:
+        return 0
 
     r = rank.count(True) / num_distinct_labels
 
@@ -189,7 +193,7 @@ def compute(gold_dataset, guess_dataset, ks=None, inv_propensity_scores_dict=Non
     for guess, gold in zip(guess_dataset, gold_dataset):
         try:
             assert (
-                str(gold["uid"]).strip() == str(guess["id"]).strip()
+                str(gold["id"]).strip() == str(guess["id"]).strip()
             ), "Items must have same order with same IDs"
         except KeyError:
             print(gold)
@@ -211,7 +215,6 @@ def compute(gold_dataset, guess_dataset, ks=None, inv_propensity_scores_dict=Non
             )
             for k in ks:
                 if k > 0:
-                    p_at_k = ranking_metrics["precision@{}".format(k)]
                     result["precision@{}".format(k)] += ranking_metrics[
                         "precision@{}".format(k)
                     ]
@@ -288,7 +291,6 @@ if __name__ == "__main__":
         "--ks",
         type=str,
         required=False,
-        default="1,5,10,15",
         default=None,
         help="Comma separated list of positive integers for recall@k and precision@k",
     )

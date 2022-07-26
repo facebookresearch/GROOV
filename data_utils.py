@@ -12,7 +12,8 @@ import random
 
 
 class Seq2SetDataset(Dataset):
-    def __init__(self, path, sep, replace_underscores=False, read_per_line=False, single_label=False):
+    def __init__(self, path, sep, replace_underscores=False, 
+                 read_per_line=False, single_label=False, output_key="output"):
         self.path = path
         self.sep = sep
         self.data = None
@@ -21,6 +22,7 @@ class Seq2SetDataset(Dataset):
         self.read_per_line = read_per_line
         self.single_label = single_label
 
+        self.output_key = output_key    # key for gold annotations 
 
     def read_data(self):
 
@@ -32,20 +34,20 @@ class Seq2SetDataset(Dataset):
             else:
                 self.data = json.load(f)
 
-        self.label_set = set(chain.from_iterable(row["output"] for row in self.data))
+        self.label_set = set(chain.from_iterable(row[self.output_key] for row in self.data))
 
     def dedupe_data(self, tokenizer):
         for i, line in enumerate(self.data):
             new_output = []
             tokenized_labels = []
-            for label in line['output']:
+            for label in line[self.output_key]:
                 tokenized = tuple(tokenizer(label).input_ids[:-1])
                 if tokenized not in tokenized_labels:
                     new_output.append(label)
                     tokenized_labels.append(tokenized)
                 else:
-                    print(f"Line {line['uid']} has repeated labels!")
-            line['output'] = new_output
+                    print(f"Line {line['id']} has repeated labels!")
+            line[self.output_key] = new_output
             if i % 10000 == 0:
                 print(i)
 
@@ -56,6 +58,7 @@ class Seq2SetDataset(Dataset):
         return len(self.data)
 
     def order_labels(self, label_seq):
+        # Comment this line to disable label shuffling
         random.shuffle(label_seq)
         return label_seq
 
@@ -79,13 +82,7 @@ class Seq2SetDataset(Dataset):
         example = self.data[idx]
         id = example["id"] if "id" in example else example["uid"]
         input = example["input"]
-        labels = [random.choice(example["output"])] if self.single_label else self.order_labels(example["output"])
-
-        # if idx == 0:
-        #     print(
-        #         input.lower().strip(),  # in
-        #         self.sep.join(self.label_to_str(label) for label in labels)  # out
-        #     )
+        labels = [random.choice(example[self.output_key])] if self.single_label else self.order_labels(example[self.output_key])
 
         out_str = self.sep.join(self.label_to_str(label) for label in labels)
 
