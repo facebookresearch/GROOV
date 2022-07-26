@@ -20,7 +20,7 @@ from torch.utils.data import DataLoader, SequentialSampler
 
 from data_utils import Seq2SetDataset
 from decode_utils import score_labels_by_probability_sum, LabelTrie
-from local_configs import LOCAL_DATA_DIR
+from local_configs import LOCAL_DATA_DIR, OUTPUT_DIR
 from s2s_model import make_s2s_batch, compute_metrics
 from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 from utils import prepare_tokenizer
@@ -198,12 +198,17 @@ def decode_s2s(model, dataset, label_set, tokenizer, args, sep_token):
 
     print("Loss: {:.3f}".format(loc_loss / loc_steps))
 
+    # # Note: Only use naive approach during prediction
+    # if args.naive:
+    #     naive_method = {}
+    #     naive_method["naive"] = preds_by_method["naive"]
+
     for method, preds in preds_by_method.items():
 
         metrics = compute_metrics([x[1] for x in preds], golds)
         print(f"{method}: " + " ".join(f"{k}: {v:.3f}" for k, v in metrics.items()))
-        method_str = method + ("_lattice" if args.decode_on_lattice else "")
-        preds_file = os.path.join(LOCAL_DATA_DIR, args.output_dir, f"{args.pred_file_prefix}_{method_str}.jsonl")
+        method_str = method + ("_lattice" if args.decode_on_lattice else "") + f"_{args.dataset_name}"
+        preds_file = os.path.join(OUTPUT_DIR, args.output_dir, f"{args.pred_file_prefix}_{method_str}.jsonl")
         with open(preds_file, "w") as outfile:
             for id, preds in preds:
                 outfile.write(
@@ -215,7 +220,7 @@ def decode_s2s(model, dataset, label_set, tokenizer, args, sep_token):
                     ) + "\n"
                 )
 
-    golds_file = os.path.join(LOCAL_DATA_DIR, args.output_dir, f"{args.pred_file_prefix}_golds.jsonl")
+    golds_file = os.path.join(OUTPUT_DIR, args.output_dir, f"{args.pred_file_prefix}_golds.jsonl")
     with open(golds_file, "w") as outfile:
         json.dump(golds, outfile)
 
@@ -229,7 +234,7 @@ parser = ArgumentsS2S(decode_mode=True)
 args = parser.parse_args()
 
 model = AutoModelForSeq2SeqLM.from_pretrained(
-    os.path.join(LOCAL_DATA_DIR, args.output_dir)
+    os.path.join(OUTPUT_DIR, args.output_dir)
 ).to(args.device)
 
 tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
@@ -241,22 +246,34 @@ s2s_train_set = Seq2SetDataset(
     os.path.join(LOCAL_DATA_DIR, args.train_file_path),
     sep,
     replace_underscores=args.replace_underscores,
+    output_key=args.output_key
 )
 s2s_dev_set = Seq2SetDataset(
     os.path.join(LOCAL_DATA_DIR, args.test_file_path),
     sep,
     replace_underscores=args.replace_underscores,
+    output_key=args.output_key
 )
 
 s2s_train_set.read_data()
 s2s_dev_set.read_data()
 
-train_label_set = s2s_train_set.get_all_labels()
-dev_label_set = s2s_dev_set.get_all_labels()
-print("# of distinct labels in train set:", len(train_label_set))
-print("# of distinct labels in dev set:", len(dev_label_set))
-print("# of new labels in dev set:", len(dev_label_set.difference(train_label_set)))
-all_labels_set = train_label_set.union(dev_label_set)
+# Read candidate entities from external file
+all_labels_set = set()
+if args.label_set_file:
+    print("Reading entity list from file for creating entity trie: ", args.label_set_file)
+    with open(args.label_set_file, 'r') as fin:
+        all_labels_set = set(json.load(fin))
+
+    print("Finish loading entitiy set.")
+
+else:
+    train_label_set = s2s_train_set.get_all_labels()
+    dev_label_set = s2s_dev_set.get_all_labels()
+    print("# of distinct labels in train set:", len(train_label_set))
+    print("# of distinct labels in dev set:", len(dev_label_set))
+    print("# of new labels in dev set:", len(dev_label_set.difference(train_label_set)))
+    all_labels_set = train_label_set.union(dev_label_set)
 
 
 decode_s2s(model, s2s_dev_set, all_labels_set, tokenizer, args, sep)

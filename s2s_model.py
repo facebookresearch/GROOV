@@ -12,7 +12,6 @@ import random
 from collections import defaultdict
 from time import time, strftime
 
-import datasets
 import torch
 import torch.multiprocessing as mp
 from torch.nn.parallel.data_parallel import DataParallel
@@ -56,7 +55,8 @@ def compute_metrics(preds, golds):
 def make_s2s_model(model_name="facebook/bart-large", from_file=None, device="cuda"):
     tokenizer = AutoTokenizer.from_pretrained(model_name)
     if from_file is not None:
-        model = AutoModelForSeq2SeqLM.from_pretrained(from_file + "_dir").to(device)
+        # model = AutoModelForSeq2SeqLM.from_pretrained(from_file + "_dir").to(device)
+        model = AutoModelForSeq2SeqLM.from_pretrained(from_file).to(device)
     elif "led-base" in model_name:
         model = AutoModelForSeq2SeqLM.from_pretrained(
             model_name, gradient_checkpointing=True, use_cache=False
@@ -67,9 +67,10 @@ def make_s2s_model(model_name="facebook/bart-large", from_file=None, device="cud
     s2s_optimizer = None
     s2s_scheduler = None
     best_eval = None
+    start_epoch = None
     if from_file is not None:
         param_dict = torch.load(
-            from_file + ".pth", map_location=device
+            os.path.join(from_file, "state_dict.pth"), map_location=device
         )  # has model weights, optimizer, and scheduler states
         s2s_optimizer = AdamW(model.parameters(), lr=0.0001, eps=1e-8)
         s2s_scheduler = get_linear_schedule_with_warmup(
@@ -84,7 +85,10 @@ def make_s2s_model(model_name="facebook/bart-large", from_file=None, device="cud
         else:
             best_eval = param_dict["best_eval"]["loss"]
 
-    return s2s_scheduler, s2s_optimizer, tokenizer, model, best_eval
+        if "epoch" in param_dict:
+            start_epoch = int(param_dict["epoch"])
+
+    return s2s_scheduler, s2s_optimizer, tokenizer, model, best_eval, start_epoch
 
 
 def make_s2s_batch(
@@ -369,7 +373,7 @@ def eval_s2s_epoch(model, dataset, tokenizer, args, output_dir, sample=None):
     return loc_loss, metrics["P@3"]  # Use P@3 to decide best model
 
 
-def save_checkpoint(output_dir, s2s_model, eval_acc, s2s_optimizer, s2s_scheduler):
+def save_checkpoint(output_dir, s2s_model, eval_acc, s2s_optimizer, s2s_scheduler, epoch):
     start_time = time()
     print("Saving checkpoint starts at", strftime('%l:%M%p %Z on %b %d, %Y'))
 
@@ -378,6 +382,7 @@ def save_checkpoint(output_dir, s2s_model, eval_acc, s2s_optimizer, s2s_schedule
         "optimizer": s2s_optimizer.state_dict(),
         "scheduler": s2s_scheduler.state_dict(),
         "best_eval": {"em": eval_acc},
+        "epoch": epoch
     }
     print("Saving model {}".format(output_dir))
 
@@ -401,6 +406,7 @@ def train_s2s(
     s2s_valid_dset,
     s2s_args,
     output_dir,
+    start_epoch=0
 ):
     if s2s_optimizer is None:
         s2s_optimizer = AdamW(
@@ -413,7 +419,7 @@ def train_s2s(
             num_training_steps=(s2s_args.num_epochs + 1)
             * math.ceil(len(s2s_train_dset) / s2s_args.train_batch_size),
         )
-    for e in range(s2s_args.num_epochs):
+    for e in range(start_epoch, start_epoch + s2s_args.num_epochs):
         train_s2s_epoch(
             s2s_model,
             s2s_train_dset,
@@ -446,6 +452,6 @@ def train_s2s(
             if s2s_args.save_after_every_eval:
                 checkpoint_dir = os.path.join(output_dir, f"epoch{e}")
                 os.mkdir(checkpoint_dir)
-                save_checkpoint(checkpoint_dir, s2s_model, eval_acc, s2s_optimizer, s2s_scheduler)
+                save_checkpoint(checkpoint_dir, s2s_model, eval_acc, s2s_optimizer, s2s_scheduler, e)
             elif best_eval == None or eval_acc > best_eval:
-                save_checkpoint(output_dir, s2s_model, eval_acc, s2s_optimizer, s2s_scheduler)
+                save_checkpoint(output_dir, s2s_model, eval_acc, s2s_optimizer, s2s_scheduler, e)
