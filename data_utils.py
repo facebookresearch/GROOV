@@ -46,7 +46,8 @@ class Seq2SetDataset(Dataset):
                     new_output.append(label)
                     tokenized_labels.append(tokenized)
                 else:
-                    print(f"Line {line['id']} has repeated labels!")
+                    data_id = line["id"] if "id" in line else line["uid"]
+                    print(f"Line {data_id} has repeated labels!")
             line[self.output_key] = new_output
             if i % 10000 == 0:
                 print(i)

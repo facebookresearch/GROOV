@@ -198,11 +198,6 @@ def decode_s2s(model, dataset, label_set, tokenizer, args, sep_token):
 
     print("Loss: {:.3f}".format(loc_loss / loc_steps))
 
-    # # Note: Only use naive approach during prediction
-    # if args.naive:
-    #     naive_method = {}
-    #     naive_method["naive"] = preds_by_method["naive"]
-
     for method, preds in preds_by_method.items():
 
         metrics = compute_metrics([x[1] for x in preds], golds)
@@ -265,7 +260,7 @@ if args.label_set_file:
     with open(args.label_set_file, 'r') as fin:
         all_labels_set = set(json.load(fin))
 
-    print("Finish loading entitiy set.")
+    print("Finish loading entity set.")
 
 else:
     train_label_set = s2s_train_set.get_all_labels()

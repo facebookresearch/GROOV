@@ -6,5 +6,7 @@
 
 # Cluster-specific configs go here. This file is in gitignore so changes won't 
 # impact other checkouts of the code.
-LOCAL_DATA_DIR = "<DATA_PATH>"
-OUTPUT_DIR = "<CHECKPOINT_PATH>"
+
+
+LOCAL_DATA_DIR = "/private/home/xiaodu/GET/data/"
+OUTPUT_DIR = "/private/home/xiaodu/GET"

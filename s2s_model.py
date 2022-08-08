@@ -55,7 +55,6 @@ def compute_metrics(preds, golds):
 def make_s2s_model(model_name="facebook/bart-large", from_file=None, device="cuda"):
     tokenizer = AutoTokenizer.from_pretrained(model_name)
     if from_file is not None:
-        # model = AutoModelForSeq2SeqLM.from_pretrained(from_file + "_dir").to(device)
         model = AutoModelForSeq2SeqLM.from_pretrained(from_file).to(device)
     elif "led-base" in model_name:
         model = AutoModelForSeq2SeqLM.from_pretrained(
