@@ -190,8 +190,8 @@ def compute(gold_dataset, guess_dataset, ks=None, inv_propensity_scores_dict=Non
         gold_dataset
     ), "different size gold: {} guess: {}".format(len(guess_dataset), len(gold_dataset))
 
-    id_key = "id" if "id" in gold else "uid"
     for guess, gold in zip(guess_dataset, gold_dataset):
+        id_key = "id" if "id" in gold else "uid"
         try:
             assert (
                 str(gold[id_key]).strip() == str(guess["id"]).strip()
