@@ -39,7 +39,7 @@ transformers == 4.9.1
 ```
 ## Usage
 ### Download model and data
-The pretrained GET model can be downloaded [here](TODO). To replicate our experiments in GET paper, download the [training data and WNED benchmark](TODO). 
+The pretrained GET model can be downloaded [here](https://dl.fbaipublicfiles.com/groov/get_model.tar.gz). To replicate our experiments in GET paper, download the [training data and WNED benchmark](https://dl.fbaipublicfiles.com/groov/get_data.tar.gz). 
 
 ### Configuration
 Set the path to model checkpoint and dataset in `local_configs.py`
