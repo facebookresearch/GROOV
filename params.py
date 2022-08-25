@@ -56,6 +56,11 @@ class ArgumentsS2S(argparse.ArgumentParser):
             type=str,
             help="Path of the test file relative to the working folder defined in local_configs.py"
         )
+        parser.add_argument(
+            "--checkpoint_dir",
+            type=str,
+            help="Load pretained model from this directory"
+        )
 
         # GPU use
         parser.add_argument(
@@ -73,13 +78,13 @@ class ArgumentsS2S(argparse.ArgumentParser):
         # Model settings
         parser.add_argument(
             "--max_i_length",
-            default=256,
+            default=512,
             type=int,
             help="Max input length",
         )
         parser.add_argument(
             "--max_o_length",
-            default=128,
+            default=256,
             type=int,
             help="Max output length",
         )
@@ -139,6 +144,13 @@ class ArgumentsS2S(argparse.ArgumentParser):
             action="store_true",
         )
 
+        parser.add_argument(
+            "--output_key",
+            default="output",
+            type=str,
+            help="The key that points to gold labels in training / test data",
+        )
+        
         # Misc
         parser.add_argument(
             "--replace_underscores",
@@ -165,4 +177,15 @@ class ArgumentsS2S(argparse.ArgumentParser):
             "--pred_file_prefix",
             default="test_preds",
             type=str,
+        )
+        parser.add_argument(
+            "--label_set_file",
+            type=str,
+            help="Path to the file that contains set of labels for contrained decoding"
+        )
+        parser.add_argument(
+            "--dataset_name",
+            type=str,
+            default="aida",
+            help="identifier of datasets for naming prediction file"
         )

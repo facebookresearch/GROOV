@@ -176,10 +176,11 @@ class LabelTrie:
             zip(input_ids, input_labels_str)
         ):
 
-            # First any positve label can be decoded. This set wll shrink over time.
+            # First any positve label can be decoded. This set wll shrink over time.            
             allowed_labels = {
                 self.raw_label_id_map[l] for l in labels_str.split(self.sep_token)
             }
+
             trie_state = self.trie
             finished = False
 
@@ -222,9 +223,12 @@ class LabelTrie:
                     assert len(child_labels) == 1
                     produced_label = list(child_labels)[0]
 
+                    # For debugging
                     if produced_label not in allowed_labels:
+                        print("Produced label not in allowed labels")
                         print(self.id_raw_label_map[produced_label])
                         print([self.id_raw_label_map[x] for x in allowed_labels])
+
                     assert produced_label in allowed_labels
                     allowed_labels = allowed_labels.difference({produced_label})
 
@@ -259,3 +263,4 @@ def score_labels_by_probability_sum(sequences, scores):
             ),
         )
     )
+

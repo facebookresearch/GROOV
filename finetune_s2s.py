@@ -12,7 +12,7 @@ import torch
 
 from data_utils import Seq2SetDataset
 from decode_utils import LabelTrie
-from local_configs import LOCAL_DATA_DIR
+from local_configs import LOCAL_DATA_DIR, OUTPUT_DIR
 from params import ArgumentsS2S
 from s2s_model import make_s2s_model, train_s2s
 from utils import prepare_tokenizer
@@ -21,9 +21,9 @@ parser = ArgumentsS2S()
 s2s_args = parser.parse_args()
 
 # Prepare directory where we store output
-if not os.path.isdir(os.path.join(LOCAL_DATA_DIR, "experiments")):
-    os.mkdir(os.path.join(LOCAL_DATA_DIR, "experiments"))
-output_dir = os.path.join(LOCAL_DATA_DIR, "experiments", s2s_args.output_dir)
+if not os.path.isdir(os.path.join(OUTPUT_DIR, "experiments")):
+    os.mkdir(os.path.join(OUTPUT_DIR, "experiments"))
+output_dir = os.path.join(OUTPUT_DIR, "experiments", s2s_args.output_dir)
 
 if s2s_args.output_dir == "tmp":
     # This is the default value, we will just overwrite files here. Do not store important stuff in tmp!
@@ -33,7 +33,8 @@ else:
     # If we specified a directory, we want to make sure we don't accidentally overwrite something
     assert not os.path.isdir(output_dir), "Output directory already exists!"
 
-os.mkdir(output_dir)
+if not os.path.isdir(output_dir):
+    os.mkdir(output_dir)
 
 args_str = '\n'.join(f'{k} : {v}' for k, v in vars(s2s_args).items())
 print("*** ARGS ***\n", args_str, "\n******")
@@ -41,8 +42,12 @@ with open(os.path.join(output_dir, "args.txt"), "w") as f:
     f.write(args_str)
 
 # Initialize model and tokenizer
-s2s_scheduler, s2s_optimizer, tokenizer, model, best_eval = make_s2s_model(
-    model_name=s2s_args.model_name_or_path, from_file=None, device=s2s_args.device
+model_path = None
+if s2s_args.checkpoint_dir:
+    model_path = os.path.join(OUTPUT_DIR, s2s_args.checkpoint_dir)
+
+s2s_scheduler, s2s_optimizer, tokenizer, model, best_eval, start_epoch = make_s2s_model(
+    model_name=s2s_args.model_name_or_path, from_file=model_path, device=s2s_args.device
 )
 
 # Construct trie used for decoding and multi-option loss
@@ -53,10 +58,16 @@ sep_token = tokenizer.sep_token if tokenizer.sep_token else "[SEP]"
 train_data = os.path.join(LOCAL_DATA_DIR, s2s_args.train_file_path)
 test_data = os.path.join(LOCAL_DATA_DIR, s2s_args.test_file_path)
 s2s_train_set = Seq2SetDataset(
-    train_data, sep_token, replace_underscores=s2s_args.replace_underscores, single_label=s2s_args.single_label
+    train_data, sep_token, 
+    replace_underscores=s2s_args.replace_underscores, 
+    single_label=s2s_args.single_label,
+    output_key=s2s_args.output_key
 )
 s2s_dev_set = Seq2SetDataset(
-    test_data, sep_token, replace_underscores=s2s_args.replace_underscores, single_label=s2s_args.single_label
+    test_data, sep_token, 
+    replace_underscores=s2s_args.replace_underscores, 
+    single_label=s2s_args.single_label,
+    output_key=s2s_args.output_key
 )
 
 s2s_train_set.read_data()
@@ -89,6 +100,12 @@ if s2s_args.data_parallel:
 else:
     s2s_model = model
 
+# Restore epoch num
+if start_epoch is None:
+    start_epoch = 0
+else:
+    start_epoch += 1
+
 train_s2s(
     s2s_model,
     tokenizer,
@@ -99,5 +116,6 @@ train_s2s(
     s2s_train_set,
     s2s_dev_set,
     s2s_args,
-    output_dir
+    output_dir,
+    start_epoch
 )
